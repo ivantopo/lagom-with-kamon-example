@@ -9,6 +9,10 @@ import play.api.libs.ws.ahc.AhcWSComponents
 import kamon.example.lagom.api.LagomwithkamonexampleService
 import com.lightbend.lagom.scaladsl.broker.kafka.LagomKafkaComponents
 import com.softwaremill.macwire._
+import kamon.Kamon
+import kamon.prometheus.PrometheusReporter
+
+import scala.concurrent.Future
 
 class LagomwithkamonexampleLoader extends LagomApplicationLoader {
 
@@ -28,6 +32,15 @@ abstract class LagomwithkamonexampleApplication(context: LagomApplicationContext
     with CassandraPersistenceComponents
     with LagomKafkaComponents
     with AhcWSComponents {
+
+  // These lines are only necessary when doing compile-time dependency injection. When using Guice, a GuiceModule that
+  // is included in kamon-play should be automatically picked up and configured.
+  Kamon.reconfigure(context.playContext.initialConfiguration.underlying)
+  Kamon.addReporter(new PrometheusReporter())
+
+  context.playContext.lifecycle.addStopHook{ () ⇒
+    Future.successful(Kamon.stopAllReporters())
+  }
 
   // Bind the service that this server provides
   override lazy val lagomServer = serverFor[LagomwithkamonexampleService](wire[LagomwithkamonexampleServiceImpl])
